@@ -7,6 +7,7 @@ import { HeaderContent } from '@/components/HeaderContent';
 import { GenderStudent, StatusClass, TypeRequireClass } from '@/constants';
 import { useAppDispatch } from '@/lib';
 import { setDataClassById } from '@/lib/redux/app/class.slice';
+import { upLoadFiles } from '@/share/upLoadFile';
 import { ItemAddOrUpdateDto, PopupEditOrAddV1 } from '@/uiCore';
 import Pagination from '@/uiCore/Pagination';
 import Table from '@/uiCore/Table';
@@ -211,7 +212,7 @@ export function ClassSection(): JSX.Element {
       label: 'Tình trạng hiện tại học viên',
       name: 'studentStatus',
       readOnly: false,
-      type: 'textarea',
+      type: 'editor',
       value: classByIdEdit?.studentStatus || '<b>Nhập thông tin tại đây ...</b>',
       canUpdate: true,
     },
@@ -219,8 +220,16 @@ export function ClassSection(): JSX.Element {
       label: 'Thông tin thêm về học sinh',
       name: 'moreInfoStudent',
       readOnly: false,
-      type: 'textarea',
+      type: 'editor',
       value: classByIdEdit?.moreInfoStudent || '<b>Nhập thông tin tại đây ...</b>',
+      canUpdate: true,
+    },
+    {
+      label: 'Hình ảnh hiển thị',
+      name: 'image',
+      readOnly: false,
+      type: 'image',
+      value: classByIdEdit?.image || '',
       canUpdate: true,
     },
   ];
@@ -289,6 +298,7 @@ export function ClassSection(): JSX.Element {
                 dispatch(setDataClassById({ data: undefined }));
               }}
               onSubmitCreate={handleCreateClass}
+              handleUpLoadFiles={(files) => upLoadFiles('image', files)}
             />
           ) : (
             <></>

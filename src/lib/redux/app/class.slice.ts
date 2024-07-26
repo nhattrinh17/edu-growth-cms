@@ -28,6 +28,7 @@ interface ClassItem {
   moreInfoStudent: string;
   receivingFee: number;
   userReceiverId: number;
+  image: string;
   userReceiver: {
     name: string;
     email: string;

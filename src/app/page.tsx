@@ -19,8 +19,8 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="flex min-h-screen items-center justify-between p-24 overflow-hidden">
-      <Image src="/logo.png" alt="Game CMS" width={105} height={23} className="w-[80%] h-[80%] object-contain animate-pulse" />
+    <main className="flex justify-center min-h-screen items-center p-24 overflow-hidden">
+      <Image src="/logo.png" alt="Game CMS" width={986} height={154} className="w-[80%] h-[80%] object-contain animate-pulse" />
     </main>
   );
 }

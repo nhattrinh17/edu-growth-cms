@@ -27,28 +27,61 @@ export interface ItemAddOrUpdateDto {
 export interface DataEditDto {
   data: ItemAddOrUpdateDto[];
   onCancel: () => void;
-  maxWidth?: number;
-  minWidth?: number;
+  maxWidth?: number | string;
+  minWidth?: number | string;
   id?: number;
   title?: string;
   textWarning?: string;
   onSubmit?: (id: number, data: any, dispatch: any) => void;
   onSubmitCreate?: (data: any, dispatch: any) => void;
-  handleUploadOneFile?: (file: File) => Promise<string>;
+  handleUpLoadFiles?: (file: FileList) => Promise<string[]>;
+  position?: any;
 }
 
-export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSubmit, title, textWarning, handleUploadOneFile, onSubmitCreate }: DataEditDto) {
+class CustomFileList extends Array<File> {
+  constructor(...files: File[]) {
+    super(...files);
+    Object.setPrototypeOf(this, CustomFileList.prototype);
+  }
+
+  item(index: number): File {
+    return this[index];
+  }
+}
+
+export function PopupEditOrAddV1({
+  //
+  id,
+  data,
+  minWidth,
+  maxWidth,
+  onCancel,
+  onSubmit,
+  title,
+  textWarning,
+  handleUpLoadFiles,
+  onSubmitCreate,
+  position = 'absolute',
+}: DataEditDto) {
   const [dataState, setDataState] = useState(data);
+  // console.log('🚀 ~ dataState:', dataState);
   const isUnableBtn = dataState.some((item) => item.canUpdate);
   const editorRef = useRef<any>();
 
   const dispatch = useAppDispatch();
 
-  const handleOnChangeInputOrSelect = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>, col: ItemAddOrUpdateDto) => {
+  const handleOnChangeInputOrSelect = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>, col: ItemAddOrUpdateDto) => {
     //   const element = e.target as HTMLOptionElement;
     setDataState((pre) => {
       const dataNew = pre.map((item) => {
         if (item.name === col.name) {
+          if (col.type == 'checkbox') {
+            const elementCheckbox: any = e.target;
+            return {
+              ...item,
+              value: elementCheckbox.checked,
+            };
+          }
           return {
             ...item,
             value: e.target.value,
@@ -61,13 +94,21 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
     });
   };
 
-  const handleChangeFile = (urlImage: string, col: ItemAddOrUpdateDto) => {
+  const handleChangeFile = (urlImage: string[], col: ItemAddOrUpdateDto, deleteImage = false) => {
     setDataState((pre) => {
       const dataNew = pre.map((item) => {
         if (item.name === col.name) {
+          let newImages = item.value ? item.value.toString().split('*_*') : [];
+          // console.log('🚀 ~ dataNew ~ newImages:', item.value, newImages);
+          if (!deleteImage) {
+            newImages.push(...urlImage);
+          } else {
+            newImages = [...newImages].filter((item) => !urlImage.includes(item));
+          }
+          // console.log('🚀 ~ dataNew ~ newImages:', newImages);
           return {
             ...item,
-            value: urlImage,
+            value: newImages.join('*_*'),
           };
         } else {
           return item;
@@ -77,16 +118,34 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
     });
   };
 
+  // Editor
+  const handleUploadImg = async (blobInfo: any, progress: any): Promise<string> => {
+    const blob = blobInfo.blob();
+    const file = new File([blob], blobInfo.filename(), { type: blob.type });
+    const fileList = new CustomFileList(file);
+    const uploadImg: string[] = handleUpLoadFiles ? await handleUpLoadFiles(fileList) : [];
+    return uploadImg[0];
+  };
+
   return (
-    <div onClick={onCancel} className={cx('wrapper')}>
+    <div
+      onClick={onCancel}
+      className={cx('wrapper')}
+      style={{
+        position: position || 'absolute',
+      }}>
       <form
-        className={cx('wrapper__form')}
+        className={cx('wrapper__form', 'shadow-sm')}
+        style={{
+          minWidth: minWidth || 400,
+          maxWidth: maxWidth || 'auto',
+        }}
         onSubmit={(e) => {
           e.preventDefault();
           const dataSend: any = {};
           dataState.forEach((item, index) => {
             if (item.canUpdate) {
-              if (item.type !== 'textarea') dataSend[item.name] = item.value;
+              if (item.type !== 'editor') dataSend[item.name] = item.value;
               else dataSend[item.name] = editorRef.current[item.name].getContent();
             }
           });
@@ -97,12 +156,7 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
           }
           onCancel();
         }}>
-        <div
-          className={cx('group__list')}
-          style={{
-            minWidth: minWidth || 400,
-          }}
-          onClick={(e) => e.stopPropagation()}>
+        <div className={cx('group__list')} onClick={(e) => e.stopPropagation()}>
           <div className={cx('body__header')}>
             <h1 className={cx('body__header--text', 'flex-1 ')}>{title || 'Cập nhật quá trình giao dịch'}</h1>
             <FontAwesomeIcon className={cx('body__header--icon')} icon={faXmark} onClick={onCancel} />
@@ -126,35 +180,67 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
                     </option>
                   ))}
                 </select>
-              ) : col.type == 'image' ? (
-                <div className="flex items-center">
+              ) : col.type == 'images' || col.type == 'image' ? (
+                <div className="">
                   <input
                     type="file"
                     name={col.name}
                     required={col.required}
+                    multiple
                     onChange={async (e) => {
-                      if (e.target.files && handleUploadOneFile) {
-                        const urlImage = await handleUploadOneFile(e.target.files[0]);
-                        if (urlImage) {
+                      if (e.target.files && handleUpLoadFiles) {
+                        const urlImage = await handleUpLoadFiles(e.target.files);
+                        if (urlImage.length) {
                           handleChangeFile(urlImage, col);
                         }
                       }
                     }}
                   />
-                  <Image alt="Image demo" src={String(col.value) || '/no-image.jpg'} width={80} height={80} className={cx('image__demo', 'rounded-2xl')} />
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    {col.value
+                      .toString()
+                      .split('*_*')
+                      .map((img, index) => (
+                        <div key={index} className="w-full relative">
+                          <div
+                            className={cx('absolute top-2 right-2 rounded-full bg-white w-6 h-6 text-center shadow-lg cursor-pointer', {
+                              hidden: !img,
+                            })}
+                            onClick={() => handleChangeFile([img], col, true)}>
+                            <FontAwesomeIcon icon={faXmark} className=" text-base" />
+                          </div>
+                          <Image
+                            //
+                            key={index}
+                            alt="Image demo"
+                            src={String(img) || '/no-image.jpg'}
+                            width={350}
+                            height={250}
+                            className={cx('image__demo', 'rounded-2xl')}
+                          />
+                        </div>
+                      ))}
+                  </div>
                 </div>
-              ) : col.type == 'textarea' ? (
+              ) : col.type == 'editor' ? (
                 <Editor
                   apiKey="luqq3j7fb1fwxw205pen9j2yi2uw2mldo3lwmkb6j4r8w0yt"
                   init={{
-                    plugins: 'anchor autolink charmap codesample emoticons image link lists media searchreplace table visualblocks wordcount checklist mediaembed casechange export formatpainter pageembed linkchecker a11ychecker tinymcespellchecker permanentpen powerpaste advtable advcode editimage advtemplate ai mentions tinycomments tableofcontents footnotes mergetags autocorrect typography inlinecss markdown',
-                    toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat',
+                    plugins: ['advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor', 'searchreplace', 'visualblocks', 'fullscreen', 'insertdatetime', 'media', 'table', 'help', 'wordcount'],
+                    // plugins: ['a11ychecker', 'advlist', 'advcode', 'advtable', 'autolink', 'checklist', 'export', 'lists', 'link', 'image', 'charmap', 'preview', 'anchor', 'searchreplace', 'visualblocks', 'powerpaste', 'fullscreen', 'formatpainter', 'insertdatetime', 'media', 'table', 'help', 'wordcount'],
+                    toolbar: 'undo redo | casechange blocks | bold italic backcolor | ' + 'alignleft aligncenter alignright alignjustify | ' + 'bullist numlist checklist outdent indent | removeformat | a11ycheck code table help',
+                    images_file_types: 'jpeg,jpg,jpe,jfi,jif,jfif,png,gif,bmp,webp',
+
+                    automatic_uploads: true,
+                    images_upload_handler: handleUploadImg,
+
+                    menubar: true,
                     tinycomments_mode: 'embedded',
                     tinycomments_author: 'Author name',
-                    mergetags_list: [
-                      { value: 'First.Name', title: 'First Name' },
-                      { value: 'Email', title: 'Email' },
-                    ],
+                    // mergetags_list: [
+                    //   { value: 'First.Name', title: 'First Name' },
+                    //   { value: 'Email', title: 'Email' },
+                    // ],
                     ai_request: (request: any, respondWith: any) => respondWith.string(() => Promise.reject('See docs to implement AI Assistant')),
                   }}
                   onInit={(_evt, editor) => {
@@ -165,6 +251,18 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
                   }}
                   initialValue={String(col.value)}
                 />
+              ) : col.type == 'textarea' ? (
+                <textarea
+                  value={col.value ?? ''}
+                  name={col.name}
+                  required={col.required}
+                  readOnly={col.readOnly}
+                  placeholder={col.placeholder}
+                  className={cx('group__data--input', 'min-h-[140px]', { 'group__data--input-readOnly': col.readOnly })}
+                  onChange={(e) => {
+                    handleOnChangeInputOrSelect(e, col);
+                  }}
+                />
               ) : (
                 <input
                   value={col.value ?? ''}
@@ -172,6 +270,7 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
                   type={col.type}
                   required={col.required}
                   readOnly={col.readOnly}
+                  defaultChecked={Boolean(col.value)}
                   placeholder={col.placeholder}
                   className={cx('group__data--input', { 'group__data--input-readOnly': col.readOnly })}
                   onChange={(e) => {
@@ -189,7 +288,7 @@ export function PopupEditOrAddV1({ id, data, minWidth, maxWidth, onCancel, onSub
               onSubmit={(e) => {
                 // e.preventDefault();
               }}>
-              Xác nhận
+              Submit
             </button>
           </div>
         </div>
